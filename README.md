@@ -2,9 +2,7 @@
 
 Personal config for an [Omarchy](https://omarchy.org/) install that keeps macOS keyboard habits and [AeroSpace](https://github.com/nikitabobko/AeroSpace) window management.
 
-Tested on Omarchy 4.0.4, Hyprland 0.56.2, and keyd 2.6.0. The keyboard is a Foostan Corne v4. The thumb key in the Command position sends Super/Meta, and keyd turns that into Control chords.
-
-No license is set yet. Add one before treating this as reusable.
+Tested on Omarchy 4.0.4, Hyprland 0.56.2, and keyd 2.6.0. The thumb key in the Command position sends Super/Meta, and keyd turns that into Control chords.
 
 ## What it does
 
@@ -76,15 +74,3 @@ hyprctl reload
 OmaKeys is separate. Build [maietta/omakeys](https://github.com/maietta/omakeys) and install the release binary as `~/.local/bin/omakeys`. The autostart line starts `omakeys daemon` with Hyprland. Skip that line, and the Alt+; binds, if you do not want it.
 
 `hyprctl configerrors` should print nothing after the reload.
-
-## Left out on purpose
-
-These are on this machine and are not part of the macOS-style setup:
-
-- Monitor scale. `~/.config/hypr/monitors.lua` sets GDK scale and compositor scale to 2 for a TV used as the display.
-- Ghostty font, padding, and scroll settings.
-- OpenDeck profiles for a Stream Deck.
-
-## Archive
-
-`archive/bindings.conf` is the pre-Lua launcher map. It bound Terminal, browser, files, mail, and chat to Ctrl and Ctrl+Shift so the thumb key could launch them. Omarchy 4 loads `hyprland.lua` and does not read that file. Those launchers are not active. The file lists personal apps and sites. Remove it if you publish this repo and do not want that list public.
