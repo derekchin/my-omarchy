@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Aerospace-style `resize smart ±N` for Hyprland.
+#
+# Hyprland's relative resize moves a split edge with a fixed geometric sign, so
+# the same delta grows a right-side window and shrinks a left-side one. This
+# probes which geometric sign grows the focused window, then applies +N (grow)
+# or -N (shrink) like Aerospace `resize smart`.
+#
+# Usage:
+#   hypr-resize-smart +50          # grow focused along smart axis
+#   hypr-resize-smart -50          # shrink focused along smart axis
+#   hypr-resize-smart +50 width    # force width
+#   hypr-resize-smart -50 height   # force height
+#   hypr-resize-smart +50 smart-opposite
+
+set -euo pipefail
+
+DELTA_ARG=${1:-}
+AXIS=${2:-smart}
+PROBE=10
+
+usage() {
+  echo "Usage: hypr-resize-smart +N|-N [smart|smart-opposite|width|height]" >&2
+  exit 1
+}
+
+[[ $DELTA_ARG =~ ^[+-][0-9]+$ ]] || usage
+case "$AXIS" in
+smart | smart-opposite | width | height) ;;
+*) usage ;;
+esac
+
+WANT_SIGN=1
+[[ $DELTA_ARG == -* ]] && WANT_SIGN=-1
+AMOUNT=${DELTA_ARG#[+-]}
+
+active=$(hyprctl activewindow -j 2>/dev/null) || exit 0
+address=$(jq -r '.address // empty' <<<"$active")
+[[ -n $address ]] || exit 0
+
+floating=$(jq -r '.floating' <<<"$active")
+workspace=$(jq -r '.workspace.id // empty' <<<"$active")
+ax=$(jq -r '.at[0]' <<<"$active")
+ay=$(jq -r '.at[1]' <<<"$active")
+aw=$(jq -r '.size[0]' <<<"$active")
+ah=$(jq -r '.size[1]' <<<"$active")
+
+clients=$(hyprctl clients -j 2>/dev/null)
+
+overlap1d() {
+  local a0=$1 a1=$2 b0=$3 b1=$4
+  local start end
+  start=$((a0 > b0 ? a0 : b0))
+  end=$((a1 < b1 ? a1 : b1))
+  echo $((end - start))
+}
+
+pick_axis() {
+  local prefer=$1
+  local best_h=0 best_v=0
+
+  while IFS=$'\t' read -r bx by bw bh; do
+    [[ -n $bx ]] || continue
+    local y_ov x_ov
+    y_ov=$(overlap1d "$ay" "$((ay + ah))" "$by" "$((by + bh))")
+    x_ov=$(overlap1d "$ax" "$((ax + aw))" "$bx" "$((bx + bw))")
+
+    # Side-by-side neighbor: shared vertical edge length is the y-overlap.
+    if ((y_ov > 0)) && ((bx + bw <= ax + 8 || bx + 8 >= ax + aw)); then
+      if ((y_ov > best_h)); then
+        best_h=$y_ov
+      fi
+    fi
+
+    # Stacked neighbor: shared horizontal edge length is the x-overlap.
+    if ((x_ov > 0)) && ((by + bh <= ay + 8 || by + 8 >= ay + ah)); then
+      if ((x_ov > best_v)); then
+        best_v=$x_ov
+      fi
+    fi
+  done < <(jq -r --arg addr "$address" --argjson ws "$workspace" '
+    .[]
+    | select(.address != $addr and .workspace.id == $ws and .floating == false and .mapped == true)
+    | [.at[0], .at[1], .size[0], .size[1]]
+    | @tsv
+  ' <<<"$clients")
+
+  case "$prefer" in
+  width) echo width ;;
+  height) echo height ;;
+  smart)
+    # Prefer the axis of the longest shared border (closest to parent split).
+    if ((best_v > best_h)); then
+      echo height
+    else
+      echo width
+    fi
+    ;;
+  smart-opposite)
+    if ((best_v > best_h)); then
+      echo width
+    else
+      echo height
+    fi
+    ;;
+  esac
+}
+
+axis=$(pick_axis "$AXIS")
+
+size_of() {
+  if [[ $axis == width ]]; then
+    jq -er --arg a "$address" '.[] | select(.address == $a) | .size[0]' <<<"$(hyprctl clients -j)"
+  else
+    jq -er --arg a "$address" '.[] | select(.address == $a) | .size[1]' <<<"$(hyprctl clients -j)"
+  fi
+}
+
+# Lua rejects a leading '+' in numeric literals.
+resize_by() {
+  local amount=$1
+  local x=0 y=0
+  if [[ $axis == width ]]; then
+    x=$amount
+  else
+    y=$amount
+  fi
+
+  if [[ $floating == true ]]; then
+    hyprctl dispatch "hl.dsp.window.resize({ x = $x, y = $y, relative = true })" >/dev/null
+  else
+    hyprctl dispatch "hl.dsp.window.resize({ window = \"address:$address\", x = $x, y = $y, relative = true })" >/dev/null
+  fi
+}
+
+# Floating windows grow with a positive geometric delta on that axis.
+if [[ $floating == true ]]; then
+  resize_by "$((WANT_SIGN * AMOUNT))"
+  exit 0
+fi
+
+before=$(size_of)
+resize_by "$PROBE"
+after=$(size_of)
+change=$((after - before))
+
+if ((change != 0)); then
+  if ((change > 0)); then
+    grow_geo=1
+  else
+    grow_geo=-1
+  fi
+  resize_by "$((-PROBE))" # undo probe
+else
+  resize_by "$((-PROBE))"
+  after=$(size_of)
+  change=$((after - before))
+  if ((change == 0)); then
+    exit 0
+  fi
+  if ((change > 0)); then
+    grow_geo=-1
+  else
+    grow_geo=1
+  fi
+  resize_by "$PROBE" # undo opposite probe
+fi
+
+resize_by "$((grow_geo * WANT_SIGN * AMOUNT))"
