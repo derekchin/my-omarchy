@@ -100,12 +100,18 @@ o.bind("ALT + SHIFT + L", "Swap window to the right", hl.dsp.window.swap({ direc
 o.bind("ALT + MINUS", "Shrink window width", home_bin .. "/hypr-resize-smart -50 width", { repeating = true })
 o.bind("ALT + EQUAL", "Expand window width", home_bin .. "/hypr-resize-smart +50 width", { repeating = true })
 
--- Aerospace-style maximize / restore (Alt+, and Alt+/).
--- Hyprland has no accordion layout, so this fills the work area and keeps the bar and gaps.
--- Alt+/ clears that maximize and returns the window to the tiled layout.
+-- Alt+, zooms the focused window to the work area and keeps the bar and gaps.
+-- Alt+/ zooms back out, then flips the split between stacked and side-by-side.
+-- Closing a window can leave that split vertical. The flip runs after the
+-- zoom-out, and again on a later press if the pair is already tiled.
 -- xkbcommon names the comma keysym "comma"; "COMMA" does not match.
+local function zoom_out_and_flip_split()
+	hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized", action = "unset" }))
+	hl.dispatch(hl.dsp.layout("togglesplit"))
+end
+
 o.bind("ALT + comma", "Maximize window", hl.dsp.window.fullscreen({ mode = "maximized", action = "set" }))
-o.bind("ALT + SLASH", "Restore window layout", hl.dsp.window.fullscreen({ mode = "maximized", action = "unset" }))
+o.bind("ALT + SLASH", "Zoom out and flip split", zoom_out_and_flip_split)
 
 -- Ctrl+Alt+Shift stands in for Super (Meta is consumed by keyd Cmd layer).
 -- keyd may also translate this chord to Meta; either path should hit these actions.

@@ -33,13 +33,13 @@ Alt runs the window actions. Omarchy's Super workspace and arrow-focus bindings 
 | Alt+Tab | Previous workspace |
 | Alt+- / Alt+= | Shrink or grow width. Same direction on the left and the right. |
 | Alt+, | Maximize. The bar and gaps stay. |
-| Alt+/ | Restore the tiled layout |
+| Alt+/ | Zoom back out, then flip the split |
 | Alt+; | [OmaKeys](https://github.com/maietta/omakeys) click hints |
 | Alt+Shift+; | OmaKeys grid |
 
 `bin/hypr-resize-smart` exists because a Hyprland resize delta grows a window on one side of a split and shrinks it on the other. The bindings force the width axis. The script can also do `smart`, `height`, and `smart-opposite`.
 
-Hyprland has no AeroSpace accordion layout. Maximize fills the work area and hides the other tiled windows until restore.
+Alt+, maximizes and keeps the bar and gaps. Alt+/ clears that maximize, then flips the focused split between stacked and side-by-side. Press it again to flip the split back. Closing a window can leave the remaining windows one above the other; Alt+/ turns that pair sideways.
 
 ## Layout
 
